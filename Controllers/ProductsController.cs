@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using ODataDemo.Model;
+using ODataSamples.Data;
 
 namespace ODataDemo.Controllers;
 

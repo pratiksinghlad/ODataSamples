@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
 using ODataDemo.Model;
+using ODataSamples.Data;
 
 namespace ODataDemo.Controllers;
 

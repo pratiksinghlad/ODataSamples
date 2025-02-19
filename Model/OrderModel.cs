@@ -5,11 +5,12 @@ public class OrderModel
     public int Id { get; set; }
     public DateTime OrderDate { get; set; }
 
-    // Navigation to Customer
+    // Foreign Key
     public int CustomerId { get; set; }
 
-    public CustomerModel Customer { get; set; }
+    // Navigation
+    public virtual CustomerModel Customer { get; set; }
 
     // Navigation to OrderItems
-    public ICollection<OrderItem> OrderItems { get; set; }
+    public virtual ICollection<OrderItemModel> OrderItems { get; set; }
 }

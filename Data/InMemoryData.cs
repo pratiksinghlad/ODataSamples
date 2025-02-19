@@ -1,6 +1,6 @@
 ﻿using ODataDemo.Model;
 
-namespace ODataDemo;
+namespace ODataSamples.Data;
 
 /// <summary>
 /// In-memory data for demonstration.
@@ -28,10 +28,10 @@ public static class InMemoryData
             Id = 101,
             OrderDate = new DateTime(2025, 1, 15),
             CustomerId = 1, // Link to Alice
-            OrderItems = new List<OrderItem>
+            OrderItems = new List<OrderItemModel>
             {
-                new OrderItem { Id = 1001, ProductName = "Laptop", Price = 999.99m, OrderId = 101 },
-                new OrderItem { Id = 1002, ProductName = "Mouse", Price = 19.99m, OrderId = 101 }
+                new OrderItemModel { Id = 1001, ProductName = "Laptop", Price = 999.99m, OrderId = 101 },
+                new OrderItemModel { Id = 1002, ProductName = "Mouse", Price = 19.99m, OrderId = 101 }
             }
         },
         new OrderModel
@@ -39,9 +39,9 @@ public static class InMemoryData
             Id = 102,
             OrderDate = new DateTime(2025, 1, 20),
             CustomerId = 2, // Link to Bob
-            OrderItems = new List<OrderItem>
+            OrderItems = new List<OrderItemModel>
             {
-                new OrderItem { Id = 1003, ProductName = "Keyboard", Price = 49.99m, OrderId = 102 }
+                new OrderItemModel { Id = 1003, ProductName = "Keyboard", Price = 49.99m, OrderId = 102 }
             }
         },
         new OrderModel
@@ -49,21 +49,21 @@ public static class InMemoryData
             Id = 103,
             OrderDate = new DateTime(2025, 2, 10),
             CustomerId = 1, // Link to Alice
-            OrderItems = new List<OrderItem>
+            OrderItems = new List<OrderItemModel>
             {
-                new OrderItem { Id = 1004, ProductName = "Monitor", Price = 199.99m, OrderId = 103 },
-                new OrderItem { Id = 1005, ProductName = "HDMI Cable", Price = 10.99m, OrderId = 103 }
+                new OrderItemModel { Id = 1004, ProductName = "Monitor", Price = 199.99m, OrderId = 103 },
+                new OrderItemModel { Id = 1005, ProductName = "HDMI Cable", Price = 10.99m, OrderId = 103 }
             }
         }
     };
 
-    public static readonly List<OrderItem> OrderItems = new List<OrderItem>
+    public static readonly List<OrderItemModel> OrderItems = new List<OrderItemModel>
     {
-        new OrderItem { Id = 1001, ProductName = "Laptop", Price = 999.99m, OrderId = 101 },
-        new OrderItem { Id = 1002, ProductName = "Mouse", Price = 19.99m, OrderId = 101 },
-        new OrderItem { Id = 1003, ProductName = "Keyboard", Price = 49.99m, OrderId = 102 },
-        new OrderItem { Id = 1004, ProductName = "Monitor", Price = 199.99m, OrderId = 103 },
-        new OrderItem { Id = 1005, ProductName = "HDMI Cable", Price = 10.99m, OrderId = 103 },
+        new OrderItemModel { Id = 1001, ProductName = "Laptop", Price = 999.99m, OrderId = 101 },
+        new OrderItemModel { Id = 1002, ProductName = "Mouse", Price = 19.99m, OrderId = 101 },
+        new OrderItemModel { Id = 1003, ProductName = "Keyboard", Price = 49.99m, OrderId = 102 },
+        new OrderItemModel { Id = 1004, ProductName = "Monitor", Price = 199.99m, OrderId = 103 },
+        new OrderItemModel { Id = 1005, ProductName = "HDMI Cable", Price = 10.99m, OrderId = 103 },
     };
 
     static InMemoryData()

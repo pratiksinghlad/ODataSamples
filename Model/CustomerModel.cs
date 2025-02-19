@@ -7,5 +7,5 @@ public class CustomerModel
     public string City { get; set; }
 
     // Navigation back to Orders
-    public ICollection<OrderModel> Orders { get; set; }
+    public virtual ICollection<OrderModel> Orders { get; set; }
 }

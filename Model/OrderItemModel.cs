@@ -1,6 +1,6 @@
 ﻿namespace ODataDemo.Model;
 
-public class OrderItem
+public class OrderItemModel
 {
     public int Id { get; set; }
     public string ProductName { get; set; }
@@ -9,5 +9,5 @@ public class OrderItem
     // Navigation back to Order
     public int OrderId { get; set; }
 
-    public OrderModel Order { get; set; }
+    public virtual OrderModel Order { get; set; }
 }

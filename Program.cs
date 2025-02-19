@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.OData;
+﻿using Microsoft.AspNetCore.OData;
 using Microsoft.OData.Edm;
 using Microsoft.OData.ModelBuilder;
 using ODataDemo.Model;
@@ -19,6 +19,7 @@ public class Program
             .Filter()
             .OrderBy()
             .Count()
+            .Expand()
             .SetMaxTop(100)
             .AddRouteComponents("odata", GetEdmModel())
         );
@@ -56,12 +57,14 @@ public class Program
 
     private static IEdmModel GetEdmModel()
     {
+        // The ODataConventionModelBuilder will automatically configure the navigation
+        // properties based on the model class definitions
         var builder = new ODataConventionModelBuilder();
 
-        builder.EntitySet<ProductModel>("ProductsOData");
         builder.EntitySet<OrderModel>("OrdersOData");
         builder.EntitySet<CustomerModel>("CustomersOData");
-        builder.EntitySet<OrderItem>("OrderItemsOData");
+        builder.EntitySet<ProductModel>("ProductsOData");
+        builder.EntitySet<OrderItemModel>("OrderItemsOData");
 
         return builder.GetEdmModel();
     }
