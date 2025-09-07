@@ -113,7 +113,7 @@ public static class InMemoryData
         // Ensure each Order's OrderItems collection is properly populated
         foreach (var order in Orders)
         {
-            if (order.OrderItems?.Count == 0)
+            if (order.OrderItems == null || order.OrderItems.Count == 0)
             {
                 order.OrderItems = OrderItems.Where(i => i.OrderId == order.Id).ToList();
             }
