@@ -6,41 +6,59 @@ using ODataSamples.Data;
 
 namespace ODataDemo.Controllers;
 
-[ApiController]
-[Route("odata")]
+/// <summary>
+/// OData controller for Products with full query capabilities
+/// </summary>
 public class ProductsODataController : ODataController
 {
-    // In-memory sample data
-    private static readonly List<ProductModel> _products = InMemoryData.Products;
-
-    // GET odata/Products?$filter=Price ge 300 and Price le 1000&$orderby=Name
+    /// <summary>
+    /// Gets all products with OData query support
+    /// </summary>
+    /// <returns>Queryable collection of products</returns>
+    /// <remarks>
+    /// Supports OData queries like:
+    /// - GET odata/ProductsOData?$filter=Price ge 300 and Price le 1000&$orderby=Name
+    /// - GET odata/ProductsOData?$select=Name,Price&$top=10
+    /// </remarks>
     [EnableQuery]
-    [HttpGet]
     public IActionResult Get()
     {
-        return Ok(_products.AsQueryable());
+        return Ok(InMemoryData.Products.AsQueryable());
     }
 
-    [HttpPost]
+    /// <summary>
+    /// Creates a new product
+    /// </summary>
+    /// <param name="product">The product to create</param>
+    /// <returns>The created product</returns>
     public IActionResult Post([FromBody] ProductModel product)
     {
-        // In a real application, you'd generate the Id and persist the entity.
-        product.Id = _products.Max(p => p.Id) + 1;
-        _products.Add(product);
+        ArgumentNullException.ThrowIfNull(product);
+        
+        // Generate new ID and add to collection
+        product.Id = InMemoryData.Products.Count > 0 ? InMemoryData.Products.Max(p => p.Id) + 1 : 1;
+        InMemoryData.Products.Add(product);
 
         return Ok(product);
     }
 
-    [HttpPut("{key}")]
-    public IActionResult Put([FromRoute] int key, [FromBody] ProductModel updatedProduct)
+    /// <summary>
+    /// Updates an existing product
+    /// </summary>
+    /// <param name="key">The product ID</param>
+    /// <param name="updatedProduct">The updated product data</param>
+    /// <returns>The updated product or NotFound if not exists</returns>
+    public IActionResult Put(int key, [FromBody] ProductModel updatedProduct)
     {
-        var existingProduct = _products.FirstOrDefault(p => p.Id == key);
-        if (existingProduct == null)
+        ArgumentNullException.ThrowIfNull(updatedProduct);
+        
+        var existingProduct = InMemoryData.Products.FirstOrDefault(p => p.Id == key);
+        if (existingProduct is null)
         {
             return NotFound();
         }
 
-        // Update properties - in real applications, more sophisticated handling might be required.
+        // Update properties using modern C# patterns
         existingProduct.Name = updatedProduct.Name;
         existingProduct.Price = updatedProduct.Price;
 
