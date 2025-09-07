@@ -5,27 +5,38 @@ using ODataSamples.Data;
 
 namespace ODataDemo.Controllers;
 
-[ApiController]
-[Route("odata")]
+/// <summary>
+/// OData controller for Orders with full query capabilities including expansions
+/// </summary>
 public class OrdersODataController : ODataController
 {
-    // GET /odata/Orders
-    // Supports expansions, filters, sorting, etc.
+    /// <summary>
+    /// Gets all orders with OData query support
+    /// </summary>
+    /// <returns>Queryable collection of orders</returns>
+    /// <remarks>
+    /// Supports OData queries like:
+    /// - GET /odata/OrdersOData?$expand=Customer,OrderItems
+    /// - GET /odata/OrdersOData?$filter=OrderDate gt 2025-01-01T00:00:00Z&$orderby=OrderDate desc
+    /// </remarks>
     [EnableQuery]
-    [HttpGet]
     public IActionResult Get()
     {
-        // Return IQueryable so OData can apply $filter, $expand, $orderby, etc.
         return Ok(InMemoryData.Orders.AsQueryable());
     }
 
-    // GET /odata/Orders(101)
-    // e.g. /odata/Orders(101)?$expand=Customer,OrderItems
+    /// <summary>
+    /// Gets a specific order by key with OData query support
+    /// </summary>
+    /// <param name="key">The order ID</param>
+    /// <returns>The order if found, otherwise NotFound</returns>
+    /// <remarks>
+    /// Example: GET /odata/OrdersOData(101)?$expand=Customer,OrderItems
+    /// </remarks>
     [EnableQuery]
-    [HttpGet("{key}")]
-    public IActionResult Get([FromRoute] int key)
+    public IActionResult Get(int key)
     {
         var order = InMemoryData.Orders.FirstOrDefault(o => o.Id == key);
-        return order == null ? NotFound() : Ok(order);
+        return order is not null ? Ok(order) : NotFound();
     }
 }
