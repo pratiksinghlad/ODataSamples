@@ -68,7 +68,7 @@ Data/
    ```json
    {
      "ConnectionStrings": {
-       "DefaultConnection": "Server=localhost;Database=employee;User=root;Password=admin;"
+       "DBConnection": "Server=localhost;Database=employee;User=root;Password=admin;"
      }
    }
    ```

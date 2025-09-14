@@ -14,22 +14,20 @@ namespace ODataSamples.Data.Repositories.Implementations;
 /// </summary>
 /// <typeparam name="TEntity">The entity type</typeparam>
 /// <typeparam name="TKey">The type of the entity key</typeparam>
-public class Repository<TEntity, TKey> : IRepository<TEntity, TKey> where TEntity : class
+
+public class Repository<TEntity> : IRepository<TEntity> where TEntity : class
 {
     protected readonly ApplicationDbContext _context;
     protected readonly DbSet<TEntity> _dbSet;
-    protected readonly Expression<Func<TEntity, TKey>> _keySelector;
 
     /// <summary>
     /// Initializes a new instance of the Repository class
     /// </summary>
     /// <param name="context">The database context</param>
-    /// <param name="keySelector">Expression to select the entity key</param>
-    public Repository(ApplicationDbContext context, Expression<Func<TEntity, TKey>> keySelector)
+    public Repository(ApplicationDbContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _dbSet = _context.Set<TEntity>();
-        _keySelector = keySelector ?? throw new ArgumentNullException(nameof(keySelector));
     }
 
     /// <inheritdoc/>
@@ -47,16 +45,15 @@ public class Repository<TEntity, TKey> : IRepository<TEntity, TKey> where TEntit
 
     /// <inheritdoc/>
     /// <inheritdoc/>
-    public virtual async Task<TEntity?> GetByIdAsync(TKey id)
+
+    public virtual async Task<TEntity?> GetByIdAsync(int id)
     {
-        ArgumentNullException.ThrowIfNull(id);
-        return await _dbSet.AsNoTracking().FirstOrDefaultAsync(GetKeyEqualsExpression(id));
+        return await _dbSet.FindAsync(id);
     }
 
     /// <inheritdoc/>
-    public virtual async Task<TEntity?> GetByIdAsync(TKey id, params Expression<Func<TEntity, object>>[] includeProperties)
+    public virtual async Task<TEntity?> GetByIdAsync(int id, params Expression<Func<TEntity, object>>[] includeProperties)
     {
-        ArgumentNullException.ThrowIfNull(id);
         IQueryable<TEntity> query = _dbSet.AsNoTracking();
 
         // Include related entities
@@ -66,22 +63,7 @@ public class Repository<TEntity, TKey> : IRepository<TEntity, TKey> where TEntit
         }
 
         // Find entity by key
-        return await query.FirstOrDefaultAsync(GetKeyEqualsExpression(id));
-    }
-
-    /// <summary>
-    /// Builds an expression to compare the entity key with the provided id.
-    /// </summary>
-    /// <param name="id">The key value to compare.</param>
-    /// <returns>An expression for equality comparison.</returns>
-    protected Expression<Func<TEntity, bool>> GetKeyEqualsExpression(TKey id)
-    {
-        var parameter = Expression.Parameter(typeof(TEntity), "e");
-        var body = Expression.Equal(
-            Expression.Invoke(_keySelector, parameter),
-            Expression.Constant(id, typeof(TKey))
-        );
-        return Expression.Lambda<Func<TEntity, bool>>(body, parameter);
+        return await query.FirstOrDefaultAsync(e => EF.Property<int>(e, "Id") == id);
     }
 
     /// <inheritdoc/>
@@ -152,7 +134,7 @@ public class Repository<TEntity, TKey> : IRepository<TEntity, TKey> where TEntit
     }
 
     /// <inheritdoc/>
-    public virtual async Task<bool> DeleteByIdAsync(TKey id)
+    public virtual async Task<bool> DeleteByIdAsync(int id)
     {
         var entity = await GetByIdAsync(id);
         if (entity is null)

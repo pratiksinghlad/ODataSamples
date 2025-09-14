@@ -29,10 +29,10 @@ builder.Services.AddControllers()
         .AddRouteComponents("odata", GetEdmModel()));
 
 // Configure Entity Framework with MySQL
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = builder.Configuration.GetConnectionString("DBConnection");
 if (string.IsNullOrEmpty(connectionString))
 {
-    throw new InvalidOperationException("Connection string 'DefaultConnection' not found. Please ensure it is defined in your appsettings.json or appsettings.secret.json configuration files under the 'ConnectionStrings' section.");
+    throw new InvalidOperationException("Connection string 'DBConnection' not found. Please ensure it is defined in your appsettings.json or appsettings.secret.json configuration files under the 'ConnectionStrings' section.");
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>

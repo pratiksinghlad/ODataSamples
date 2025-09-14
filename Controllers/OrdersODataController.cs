@@ -41,7 +41,7 @@ public class OrdersODataController : ODataController
             var orders = _unitOfWork.Orders.GetAll();
             return Ok(orders);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // TODO: Inject and use a logger to log the exception details securely
             // _logger.LogError(ex, "An error occurred while retrieving orders");
@@ -65,7 +65,7 @@ public class OrdersODataController : ODataController
             var order = await _unitOfWork.Orders.GetByIdAsync(key);
             return order is not null ? Ok(order) : NotFound();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // TODO: Inject and use a logger to log the exception details securely
             // _logger.LogError(ex, "An error occurred while retrieving the order");
@@ -113,7 +113,7 @@ public class OrdersODataController : ODataController
 
             return Created($"/odata/OrdersOData({createdOrder.Id})", createdOrder);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // TODO: Inject and use a logger to log the exception details securely
             // _logger.LogError(ex, "An error occurred while creating the order");
@@ -160,7 +160,7 @@ public class OrdersODataController : ODataController
 
             return Updated(existingOrder);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // TODO: Inject and use a logger to log the exception details securely
             // _logger.LogError(ex, "An error occurred while updating the order");
@@ -187,7 +187,7 @@ public class OrdersODataController : ODataController
             await _unitOfWork.SaveChangesAsync();
             return NoContent();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // TODO: Inject and use a logger to log the exception details securely
             // _logger.LogError(ex, "An error occurred while deleting the order");
@@ -208,7 +208,7 @@ public class OrdersODataController : ODataController
             var orders = _unitOfWork.Orders.GetWithFullDetails();
             return Ok(orders);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // TODO: Inject and use a logger to log the exception details securely
             // _logger.LogError(ex, "An error occurred while retrieving orders with details");
@@ -230,7 +230,7 @@ public class OrdersODataController : ODataController
             var orders = _unitOfWork.Orders.GetRecentOrders(days);
             return Ok(orders);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // TODO: Inject and use a logger to log the exception details securely
             // _logger.LogError(ex, "An error occurred while retrieving recent orders");
