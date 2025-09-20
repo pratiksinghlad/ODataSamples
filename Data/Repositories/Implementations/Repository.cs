@@ -33,6 +33,8 @@ public class Repository<TEntity> : IRepository<TEntity> where TEntity : class
     /// <inheritdoc/>
     public virtual IQueryable<TEntity> GetAll()
     {
+        Console.WriteLine($"🔍 Repository<{typeof(TEntity).Name}>.GetAll() called");
+        Console.WriteLine($"   ↳ This is used by OData - filtering will be added by [EnableQuery] attribute");
         return _dbSet.AsNoTracking();
     }
 
@@ -40,6 +42,8 @@ public class Repository<TEntity> : IRepository<TEntity> where TEntity : class
     public virtual IQueryable<TEntity> GetWhere(Expression<Func<TEntity, bool>> filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
+        Console.WriteLine($"🔍 Repository<{typeof(TEntity).Name}>.GetWhere() called with filter: {filter}");
+        Console.WriteLine($"   ↳ This indicates CUSTOM repository method usage, NOT OData filtering");
         return _dbSet.AsNoTracking().Where(filter);
     }
 
@@ -70,6 +74,8 @@ public class Repository<TEntity> : IRepository<TEntity> where TEntity : class
     public virtual IQueryable<TEntity> GetWithInclude(params Expression<Func<TEntity, object>>[] includeProperties)
     {
         IQueryable<TEntity> query = _dbSet.AsNoTracking();
+        Console.WriteLine($"🔍 Repository<{typeof(TEntity).Name}>.GetWithInclude() called with {includeProperties.Length} includes");
+        Console.WriteLine($"   ↳ This indicates CUSTOM repository method for complex queries with relationships");
 
         foreach (var includeProperty in includeProperties)
         {

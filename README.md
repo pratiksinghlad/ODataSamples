@@ -1,23 +1,832 @@
-# ODataSamples
+# OData .NET 9 Sample Application
 
-**.NET 9 OData API with Minimal APIs and Central Package Management**
+A comprehensive ASP.NET Core 9 application demonstrating OData integration with Entity Framework Core, MySQL, and the Repository pattern using C# 13 features.
 
-This project demonstrates a modern, enterprise-grade OData implementation using .NET 9, Entity Framework Core, and the Repository pattern with Unit of Work.
+## 📋 Table of Contents
 
-## 🚀 Features
+- [Architecture Overview](#architecture-overview)
+- [How OData Filtering Works](#how-odata-filtering-works)
+- [Customer CRUD Example - Complete Flow](#customer-crud-example---complete-flow)
+- [Repository Pattern Implementation](#repository-pattern-implementation)
+- [Project Structure](#project-structure)
+- [Setup and Configuration](#setup-and-configuration)
+- [OData Query Examples](#odata-query-examples)
+- [API Endpoints](#api-endpoints)
 
-- **🎯 .NET 9** with C# 13 language features
-- **📊 EF Core 9.0.2** Code First approach with MySQL database
-- **🏗️ Repository Pattern** with Unit of Work for clean architecture
-- **🔍 Full OData Support** with all query capabilities ($filter, $expand, $orderby, $select, $top, $skip, $count)
-- **📚 Minimal APIs** alongside OData controllers
-- **🔒 Clean Architecture** with dependency injection and separation of concerns
-- **📦 Central Package Management** with Directory.Packages.props
-- **🏥 Health Checks** for monitoring application status
-- **📖 API Documentation** with Scalar UI
-- **🌱 Data Seeding** for development and testing
+---
 
-## 🏛️ Architecture
+## 🏗️ Architecture Overview
+
+This application follows a clean architecture pattern with the following layers:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    OData Controllers                        │
+│  (CustomersODataController, ProductsODataController, etc.) │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────┐
+│                  Unit of Work                               │
+│              (IUnitOfWork, UnitOfWork)                      │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────┐
+│                 Repository Layer                            │
+│    (IRepository<T>, ICustomerRepository, etc.)             │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────┐
+│              Entity Framework Core                          │
+│              (ApplicationDbContext)                         │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────┐
+│                  MySQL Database                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔍 How OData Filtering Works
+
+### The Magic Behind `[EnableQuery]`
+
+The key to OData filtering is the `[EnableQuery]` attribute. Here's how it works:
+
+#### 1. **OData Configuration** (Program.cs)
+
+```csharp
+builder.Services.AddControllers()
+    .AddOData(options => options
+        .Select()     // Enables $select queries
+        .Filter()     // Enables $filter queries  ⭐ KEY FOR FILTERING
+        .OrderBy()    // Enables $orderby queries
+        .Count()      // Enables $count queries
+        .Expand()     // Enables $expand queries
+        .SetMaxTop(1000)
+        .AddRouteComponents("odata", GetEdmModel()));
+```
+
+#### 2. **EDM Model Configuration**
+
+```csharp
+static IEdmModel GetEdmModel()
+{
+    var builder = new ODataConventionModelBuilder();
+    
+    // Register entity sets - creates OData endpoints
+    builder.EntitySet<CustomerModel>("CustomersOData");
+    builder.EntitySet<ProductModel>("ProductsOData");
+    builder.EntitySet<OrderModel>("OrdersOData");
+    
+    // Configure entity properties
+    builder.EntityType<CustomerModel>()
+        .HasKey(c => c.Id);
+    
+    return builder.GetEdmModel();
+}
+```
+
+#### 3. **Controller with EnableQuery**
+
+```csharp
+[EnableQuery(MaxExpansionDepth = 3, MaxTop = 1000, MaxOrderByNodeCount = 10)]
+public IActionResult Get()
+{
+    try
+    {
+        // ⭐ CRITICAL: Returns IQueryable, NOT executed data
+        var customers = _unitOfWork.Customers.GetAll();
+        return Ok(customers);
+    }
+    catch (Exception ex)
+    {
+        // Error handling
+    }
+}
+```
+
+### 🎯 **The Filter Flow Process**
+
+When a client makes an OData request like:
+```
+GET /odata/CustomersOData?$filter=City eq 'Seattle'&$orderby=Name
+```
+
+Here's what happens step by step:
+
+1. **Request Parsing**: OData middleware parses the query string
+2. **EnableQuery Processing**: The `[EnableQuery]` attribute intercepts the `IQueryable<CustomerModel>`
+3. **Query Translation**: OData translates `$filter=City eq 'Seattle'` into LINQ: `.Where(c => c.City == "Seattle")`
+4. **Query Composition**: OData builds the complete LINQ query
+5. **EF Core Translation**: Entity Framework converts LINQ to SQL
+6. **Database Execution**: MySQL executes the optimized SQL query
+7. **Result Materialization**: Only filtered results are returned
+
+### 🔑 **Why Repository Returns IQueryable**
+
+```csharp
+// In Repository<TEntity>
+public virtual IQueryable<TEntity> GetAll()
+{
+    return _dbSet.AsNoTracking();  // ⭐ IQueryable - NOT executed yet!
+}
+```
+
+**This is crucial because:**
+- `IQueryable` represents a query that hasn't been executed
+- OData can modify this query by adding WHERE, ORDER BY, SELECT clauses
+- Only the final composed query hits the database
+- This enables server-side filtering and optimal performance
+
+---
+
+## 👥 Customer CRUD Example - Complete Flow
+
+Let's trace a complete customer operation from HTTP request to database:
+
+### � **GET All Customers with Filter**
+
+**HTTP Request:**
+```http
+GET /odata/CustomersOData?$filter=City eq 'Seattle'&$expand=Orders&$select=Name,City
+```
+
+**Flow Trace:**
+
+1. **� HTTP Request** arrives at ASP.NET Core
+2. **�🎯 Route Matching** → `CustomersODataController.Get()`
+3. **🏗️ Controller Action:**
+   ```csharp
+   [EnableQuery(MaxExpansionDepth = 3, MaxTop = 1000)]
+   public IActionResult Get()
+   {
+       var customers = _unitOfWork.Customers.GetAll(); // Step 4
+       return Ok(customers); // Step 8
+   }
+   ```
+4. **🏢 Unit of Work:**
+   ```csharp
+   public ICustomerRepository Customers =>
+       _customerRepository ??= new CustomerRepository(_context);
+   ```
+5. **📚 Customer Repository:**
+   ```csharp
+   // CustomerRepository inherits from Repository<CustomerModel>
+   public class CustomerRepository : Repository<CustomerModel>, ICustomerRepository
+   ```
+6. **🗃️ Base Repository:**
+   ```csharp
+   public virtual IQueryable<TEntity> GetAll()
+   {
+       return _dbSet.AsNoTracking(); // Returns IQueryable<CustomerModel>
+   }
+   ```
+7. **⚡ OData Magic** (`[EnableQuery]` processes the IQueryable):
+   - Parses `$filter=City eq 'Seattle'` → `.Where(c => c.City == "Seattle")`
+   - Parses `$expand=Orders` → `.Include(c => c.Orders)`
+   - Parses `$select=Name,City` → `.Select(c => new { c.Name, c.City })`
+8. **�️ EF Core** converts to SQL:
+   ```sql
+   SELECT c.Name, c.City 
+   FROM Customers c 
+   LEFT JOIN Orders o ON c.Id = o.CustomerId 
+   WHERE c.City = 'Seattle'
+   ```
+
+> **🔍 Want to understand the complete automatic conversion process?**  
+> See our detailed guide: [How OData Automatically Converts IQueryable to SQL](./ODATA_AUTOMATIC_CONVERSION.md)
+>
+> This document explains exactly how your simple controller code:
+> ```csharp
+> var customers = _unitOfWork.Customers.GetAll();
+> return Ok(customers);
+> ```
+> Automatically becomes optimized SQL queries with zero additional code!
+
+9. **🏗️ MySQL** executes query and returns results
+10. **📤 Response** sent back as JSON
+
+### 📝 **POST Create Customer**
+
+**HTTP Request:**
+```http
+POST /odata/CustomersOData
+Content-Type: application/json
+
+{
+    "Name": "John Doe",
+    "City": "Portland"
+}
+```
+
+**Flow Trace:**
+
+1. **🌐 HTTP POST** → `CustomersODataController.Post()`
+2. **🎯 Controller Action:**
+   ```csharp
+   public async Task<IActionResult> Post([FromBody] CustomerModel customer)
+   {
+       // Validation
+       if (!ModelState.IsValid)
+           return BadRequest(ModelState);
+           
+       // Reset auto-generated fields
+       customer.Id = 0;
+       customer.CreatedAt = DateTime.UtcNow;
+       customer.UpdatedAt = DateTime.UtcNow;
+       
+       var createdCustomer = await _unitOfWork.Customers.AddAsync(customer); // Step 3
+       await _unitOfWork.SaveChangesAsync(); // Step 6
+       
+       return Created($"/odata/CustomersOData({createdCustomer.Id})", createdCustomer);
+   }
+   ```
+3. **📚 Customer Repository AddAsync:**
+   ```csharp
+   // Inherited from Repository<CustomerModel>
+   public virtual async Task<TEntity> AddAsync(TEntity entity)
+   {
+       ArgumentNullException.ThrowIfNull(entity);
+       var entityEntry = await _dbSet.AddAsync(entity);
+       return entityEntry.Entity;
+   }
+   ```
+4. **🗃️ EF Core** tracks the entity in `Added` state
+5. **🏢 Unit of Work SaveChanges:**
+   ```csharp
+   public async Task<int> SaveChangesAsync()
+   {
+       return await _context.SaveChangesAsync(); // Step 6
+   }
+   ```
+6. **🗄️ EF Core** generates and executes:
+   ```sql
+   INSERT INTO Customers (Name, City, CreatedAt, UpdatedAt) 
+   VALUES ('John Doe', 'Portland', '2025-09-20 10:30:00', '2025-09-20 10:30:00');
+   SELECT LAST_INSERT_ID();
+   ```
+7. **📤 Response:** `201 Created` with location header and customer data
+
+### ✏️ **PUT Update Customer**
+
+**HTTP Request:**
+```http
+PUT /odata/CustomersOData(5)
+Content-Type: application/json
+
+{
+    "Name": "John Smith",
+    "City": "Seattle"
+}
+```
+
+**Flow Trace:**
+
+1. **🌐 HTTP PUT** → `CustomersODataController.Put(int key, CustomerModel updatedCustomer)`
+2. **🔍 Get Existing Customer:**
+   ```csharp
+   var existingCustomer = await _unitOfWork.Customers.GetByIdAsync(key);
+   ```
+3. **📚 Repository GetByIdAsync:**
+   ```csharp
+   public virtual async Task<TEntity?> GetByIdAsync(int id)
+   {
+       return await _dbSet.FindAsync(id); // EF Core Find by primary key
+   }
+   ```
+4. **✏️ Update Properties:**
+   ```csharp
+   existingCustomer.Name = updatedCustomer.Name;
+   existingCustomer.City = updatedCustomer.City;
+   existingCustomer.UpdatedAt = DateTime.UtcNow;
+   
+   _unitOfWork.Customers.Update(existingCustomer);
+   ```
+5. **�️ Repository Update:**
+   ```csharp
+   public virtual void Update(TEntity entity)
+   {
+       _dbSet.Update(entity); // Marks entity as Modified
+   }
+   ```
+6. **💾 Save Changes** → SQL:
+   ```sql
+   UPDATE Customers 
+   SET Name = 'John Smith', City = 'Seattle', UpdatedAt = '2025-09-20 10:35:00'
+   WHERE Id = 5;
+   ```
+
+### 🗑️ **DELETE Customer**
+
+**HTTP Request:**
+```http
+DELETE /odata/CustomersOData(5)
+```
+
+**Flow Trace:**
+
+1. **🌐 HTTP DELETE** → `CustomersODataController.Delete(int key)`
+2. **🗑️ Delete Operation:**
+   ```csharp
+   var deleted = await _unitOfWork.Customers.DeleteByIdAsync(key);
+   ```
+3. **📚 Repository DeleteByIdAsync:**
+   ```csharp
+   public virtual async Task<bool> DeleteByIdAsync(int id)
+   {
+       var entity = await GetByIdAsync(id);
+       if (entity is null)
+           return false;
+           
+       Delete(entity);
+       return true;
+   }
+   ```
+4. **🗄️ EF Core** executes:
+   ```sql
+   DELETE FROM Customers WHERE Id = 5;
+   ```
+
+---
+
+## 🗃️ Repository Pattern Implementation
+
+### Interface Hierarchy
+
+```csharp
+IRepository<TEntity>              // Generic CRUD operations
+    ↑
+ICustomerRepository              // Customer-specific operations
+    ↑
+CustomerRepository               // Implementation
+```
+
+### Generic Repository Interface
+
+```csharp
+public interface IRepository<TEntity> where TEntity : class
+{
+    // Query operations (return IQueryable for OData)
+    IQueryable<TEntity> GetAll();
+    IQueryable<TEntity> GetWhere(Expression<Func<TEntity, bool>> filter);
+    
+    // Individual operations
+    Task<TEntity?> GetByIdAsync(int id);
+    
+    // CRUD operations
+    Task<TEntity> AddAsync(TEntity entity);
+    void Update(TEntity entity);
+    Task<bool> DeleteByIdAsync(int id);
+    
+    // Advanced queries
+    IQueryable<TEntity> GetWithInclude(params Expression<Func<TEntity, object>>[] includeProperties);
+}
+```
+
+### Customer-Specific Repository
+
+```csharp
+public interface ICustomerRepository : IRepository<CustomerModel>
+{
+    IQueryable<CustomerModel> GetByCity(string city);
+    IQueryable<CustomerModel> GetWithOrders();
+    IQueryable<CustomerModel> GetByNamePattern(string namePattern);
+}
+
+public class CustomerRepository : Repository<CustomerModel>, ICustomerRepository
+{
+    public IQueryable<CustomerModel> GetByCity(string city)
+    {
+        return GetWhere(c => c.City.Equals(city, StringComparison.OrdinalIgnoreCase));
+    }
+    
+    public IQueryable<CustomerModel> GetWithOrders()
+    {
+        return GetWithInclude(c => c.Orders);
+    }
+}
+```
+
+---
+
+## � Project Structure
+
+```
+ODataSamples/
+├── Controllers/                    # OData and REST API controllers
+│   ├── CustomersODataController.cs # Customer OData endpoint
+│   ├── ProductsODataController.cs  # Product OData endpoint
+│   └── OrdersODataController.cs    # Order OData endpoint
+├── Data/
+│   ├── Context/
+│   │   └── ApplicationDbContext.cs # EF Core DbContext
+│   ├── Repositories/
+│   │   ├── Interfaces/
+│   │   │   ├── IRepository.cs      # Generic repository interface
+│   │   │   ├── ICustomerRepository.cs
+│   │   │   ├── IProductRepository.cs
+│   │   │   └── IOrderRepository.cs
+│   │   └── Implementations/
+│   │       ├── Repository.cs       # Generic repository implementation
+│   │       ├── CustomerRepository.cs
+│   │       ├── ProductRepository.cs
+│   │       └── OrderRepository.cs
+│   ├── UnitOfWork/
+│   │   ├── IUnitOfWork.cs          # Unit of Work interface
+│   │   └── UnitOfWork.cs           # Unit of Work implementation
+│   ├── Seeding/
+│   │   └── DataSeeder.cs           # Database seeding
+│   └── InMemoryData.cs             # Sample data
+├── Model/                          # Entity models
+│   ├── CustomerModel.cs
+│   ├── ProductModel.cs
+│   ├── OrderModel.cs
+│   └── OrderItemModel.cs
+├── Program.cs                      # Application startup and configuration
+├── appsettings.json               # Application settings
+└── appsettings.secret.json        # Connection strings (git-ignored)
+```
+
+---
+
+## ⚙️ Setup and Configuration
+
+### Prerequisites
+
+- .NET 9 SDK
+- MySQL Server 8.0+
+- Visual Studio 2022 or VS Code
+
+### Database Configuration
+
+1. **Create MySQL Database:**
+   ```sql
+   CREATE DATABASE employee;
+   ```
+
+2. **Update Connection String** in `appsettings.secret.json`:
+   ```json
+   {
+     "ConnectionStrings": {
+       "DBConnection": "server=localhost;uid=root;pwd=admin;database=employee;"
+     }
+   }
+   ```
+
+3. **Run the Application:**
+   ```bash
+   dotnet run
+   ```
+
+The application automatically:
+- Applies EF Core migrations
+- Seeds sample data
+- Starts on `http://localhost:5203`
+
+### Technology Stack
+
+- **Framework:** ASP.NET Core 9 with C# 13
+- **ORM:** Entity Framework Core 9.0.2
+- **Database:** MySQL with Pomelo.EntityFrameworkCore.MySql
+- **OData:** Microsoft.AspNetCore.OData 9.2.0
+- **Architecture:** Repository Pattern + Unit of Work
+
+---
+
+## 🔍 OData Query Examples
+
+### Basic Queries
+
+```http
+# Get all customers
+GET /odata/CustomersOData
+
+# Get customer by ID
+GET /odata/CustomersOData(1)
+
+# Filter customers by city
+GET /odata/CustomersOData?$filter=City eq 'Seattle'
+
+# Order customers by name
+GET /odata/CustomersOData?$orderby=Name
+
+# Select specific fields
+GET /odata/CustomersOData?$select=Name,City
+
+# Get top 5 customers
+GET /odata/CustomersOData?$top=5
+
+# Skip first 10 customers
+GET /odata/CustomersOData?$skip=10
+
+# Count customers
+GET /odata/CustomersOData?$count=true
+```
+
+### Advanced Queries
+
+```http
+# Expand related data
+GET /odata/CustomersOData?$expand=Orders
+
+# Complex filtering
+GET /odata/CustomersOData?$filter=City eq 'Seattle' and contains(Name,'John')
+
+# Multiple expansions with select
+GET /odata/CustomersOData?$expand=Orders($select=Id,OrderDate)&$select=Name,City
+
+# Nested filtering
+GET /odata/CustomersOData?$expand=Orders($filter=OrderDate gt 2024-01-01)
+
+# Ordering with expansion
+GET /odata/CustomersOData?$expand=Orders&$orderby=Name&$filter=City eq 'Portland'
+```
+
+### Filter Operators
+
+```http
+# Equality
+$filter=City eq 'Seattle'
+
+# Inequality  
+$filter=City ne 'Seattle'
+
+# Greater than
+$filter=Id gt 10
+
+# Contains
+$filter=contains(Name,'John')
+
+# Starts with
+$filter=startswith(Name,'J')
+
+# Logical operators
+$filter=City eq 'Seattle' and Name ne 'John'
+$filter=City eq 'Seattle' or City eq 'Portland'
+
+# Date filtering
+$filter=CreatedAt gt 2024-01-01T00:00:00Z
+```
+
+---
+
+## 🔗 API Endpoints
+
+### OData Endpoints (Full Query Support)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/odata/CustomersOData` | Get all customers with OData queries |
+| GET | `/odata/CustomersOData(id)` | Get customer by ID |
+| POST | `/odata/CustomersOData` | Create new customer |
+| PUT | `/odata/CustomersOData(id)` | Update customer |
+| DELETE | `/odata/CustomersOData(id)` | Delete customer |
+| GET | `/odata/ProductsOData` | Get all products with OData queries |
+| GET | `/odata/OrdersOData` | Get all orders with OData queries |
+
+### Custom OData Functions
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/odata/CustomersOData/GetByCity?city=Seattle` | Get customers by city |
+
+### REST API Endpoints (Traditional)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/products` | Get all products (traditional REST) |
+| GET | `/api/products/{id}` | Get product by ID |
+
+### Metadata and Service Document
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/odata/$metadata` | OData metadata document |
+| GET | `/odata/` | OData service document |
+
+---
+
+## 🎯 Key Features
+
+- **� Full OData Query Support:** $filter, $orderby, $select, $expand, $top, $skip, $count
+- **🗄️ MySQL Integration:** Complete migration from SQLite to MySQL
+- **🏗️ Repository Pattern:** Clean separation of concerns with Unit of Work
+- **⚡ Performance Optimized:** AsNoTracking for read operations
+- **🔒 Validation:** Model validation with detailed error handling
+- **📊 Entity Relationships:** Proper foreign key relationships and navigation properties
+- **🔄 Auto-Migration:** Database schema updates on application start
+- **🌱 Data Seeding:** Automatic sample data population
+
+---
+
+## 🤝 Contributing
+
+This is a sample project demonstrating OData integration with .NET 9. Feel free to explore, learn, and adapt the patterns shown here for your own projects.
+
+---
+
+## 🎯 When to Use OData vs Custom Repository Methods
+
+This section explains exactly when to use each approach based on the implementation above.
+
+### ✅ **USE OData Filtering** (Recommended for most cases)
+
+**When to use:**
+- Simple filtering, sorting, and pagination
+- Flexible queries that clients might want to customize
+- Standard CRUD operations
+- When you want clients to compose their own queries
+
+**Examples:**
+```http
+# Let OData handle filtering - much more flexible
+GET /odata/CustomersOData?$filter=City eq 'Seattle'
+GET /odata/CustomersOData?$filter=City eq 'Seattle' and contains(Name,'John')
+GET /odata/CustomersOData?$orderby=Name&$top=10&$skip=20
+GET /odata/CustomersOData?$select=Name,City&$expand=Orders
+```
+
+**Controller Implementation:**
+```csharp
+[EnableQuery] // ⭐ This handles all filtering automatically
+public IActionResult Get()
+{
+    // Only calls GetAll() - OData adds filtering
+    var customers = _unitOfWork.Customers.GetAll();
+    return Ok(customers);
+}
+```
+
+**Why this is better:**
+- More flexible - clients can filter by any field
+- Less code to maintain
+- Standard OData conventions
+- Automatic query optimization
+
+### ✅ **USE Custom Repository Methods** (For business logic)
+
+**When to use:**
+- Complex business rules that can't be expressed in OData
+- Pre-built queries for specific use cases
+- Complex joins with calculated fields
+- Performance-critical queries that need optimization
+- Business operations that combine multiple data sources
+
+**Examples from the Service Layer:**
+
+#### **1. Business Statistics:**
+```csharp
+// Service method that uses GetByCity()
+public async Task<CustomerCityStatisticsDto> GetCityStatisticsAsync(string city)
+{
+    // This actually calls GetByCity() repository method
+    var customers = await _unitOfWork.Customers
+        .GetByCity(city) // 🎯 Custom repository method!
+        .Include(c => c.Orders)
+        .ToListAsync();
+
+    return new CustomerCityStatisticsDto
+    {
+        City = city,
+        TotalCustomers = customers.Count,
+        TotalOrders = customers.SelectMany(c => c.Orders).Count(),
+        // Complex business calculations...
+    };
+}
+```
+
+#### **2. Complex Date-based Analysis:**
+```csharp
+// Service method that uses GetByOrderDateRange()
+public async Task<List<CustomerSummaryDto>> GetActiveCustomersAsync()
+{
+    var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+    
+    // This calls GetByOrderDateRange() custom repository method
+    var customers = await _unitOfWork.Customers
+        .GetByOrderDateRange(thirtyDaysAgo, DateTime.UtcNow) // 🎯 Custom method!
+        .Select(c => new CustomerSummaryDto { /* ... */ })
+        .ToListAsync();
+    
+    return customers;
+}
+```
+
+#### **3. Performance-Optimized Queries:**
+```csharp
+// Service method that uses GetWithOrderStatistics()
+public async Task<CustomerDashboardDto> GetDashboardAsync(int customerId)
+{
+    // This calls GetWithOrderStatistics() for optimized includes
+    var customer = await _unitOfWork.Customers
+        .GetWithOrderStatistics() // 🎯 Pre-optimized includes!
+        .FirstOrDefaultAsync(c => c.Id == customerId);
+    
+    // Complex business logic calculations...
+}
+```
+
+### ❌ **DON'T Use Custom Repository Methods for Simple Filtering**
+
+**Wrong approach:**
+```csharp
+// ❌ Unnecessary custom method
+[HttpGet("wrong/by-city")]
+public IActionResult GetByCity(string city)
+{
+    // This unnecessarily calls GetByCity() when OData would work better
+    var customers = _unitOfWork.Customers.GetByCity(city);
+    return Ok(customers);
+}
+```
+
+**Right approach:**
+```csharp
+// ✅ Let OData handle it
+[EnableQuery]
+public IActionResult Get()
+{
+    // Client can add ?$filter=City eq 'Seattle' and it works automatically
+    var customers = _unitOfWork.Customers.GetAll();
+    return Ok(customers);
+}
+```
+
+### 🔄 **The Complete Flow Comparison**
+
+#### **OData Flow (Recommended for queries):**
+```
+1. Client: GET /odata/CustomersOData?$filter=City eq 'Seattle'
+2. Controller: GetAll() called
+3. Repository: Returns IQueryable<Customer>
+4. OData: Adds WHERE clause automatically
+5. EF Core: Generates optimized SQL
+6. Database: Executes efficient query
+```
+
+#### **Custom Repository Flow (For business logic):**
+```
+1. Client: GET /api/CustomerDemo/business-logic/city-statistics?city=Seattle
+2. Controller: Calls CustomerService
+3. Service: Calls GetByCity() repository method
+4. Repository: Returns IQueryable with predefined filter
+5. Service: Adds business logic and calculations
+6. Database: Executes with custom business rules
+```
+
+### 📊 **Performance Comparison**
+
+| Approach | Flexibility | Performance | Maintenance | Use Case |
+|----------|-------------|-------------|-------------|----------|
+| **OData Filtering** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | General queries |
+| **Custom Repository** | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Business logic |
+
+### 🎯 **Practical Guidelines**
+
+1. **Start with OData** - Use `[EnableQuery]` for 80% of your read operations
+2. **Add Custom Methods** only when you need:
+   - Complex business calculations
+   - Performance-critical queries
+   - Multi-step business operations
+   - Queries that can't be expressed in OData
+
+3. **Service Layer Pattern** - Put business logic in services that use custom repository methods
+4. **Controller Simplicity** - Keep controllers thin, delegate to services for complex operations
+
+### 🔍 **Debug Output Example**
+
+When you call different endpoints, you'll see different repository methods being called:
+
+**OData Endpoint:**
+```
+GET /odata/CustomersOData?$filter=City eq 'Seattle'
+Console Output:
+🔍 Repository<CustomerModel>.GetAll() called
+   ↳ This is used by OData - filtering will be added by [EnableQuery] attribute
+```
+
+**Business Logic Endpoint:**
+```
+GET /api/CustomerDemo/business-logic/city-statistics?city=Seattle
+Console Output:
+🏢 CustomerService.GetCityStatisticsAsync() called for city: Seattle
+🏢 CustomerRepository.GetByCity() called with city: Seattle
+   ↳ This is a CUSTOM repository method - used by business logic, not OData
+🔍 Repository<CustomerModel>.GetWhere() called with filter: c => c.City.Equals(city, ...)
+   ↳ This indicates CUSTOM repository method usage, NOT OData filtering
+```
+
+This clearly shows **when** each approach is used and **why** you need both patterns.
+
+---
+
+## 📚 Additional Resources
+
+- [OData Documentation](https://docs.microsoft.com/en-us/odata/)
+- [ASP.NET Core OData](https://docs.microsoft.com/en-us/aspnet/web-api/overview/odata-support-in-aspnet-web-api/)
+- [Entity Framework Core](https://docs.microsoft.com/en-us/ef/core/)
+- [Repository Pattern](https://docs.microsoft.com/en-us/aspnet/mvc/overview/older-versions/getting-started-with-ef-5-using-mvc-4/implementing-the-repository-and-unit-of-work-patterns-in-an-asp-net-mvc-application)
 
 ### Repository Pattern Structure
 ```
