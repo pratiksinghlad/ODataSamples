@@ -4,16 +4,12 @@ using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure user secrets in development
-if (builder.Environment.IsDevelopment())
-{
-    builder.Configuration.AddUserSecrets<Program>();
-}
 
 // Add configuration sources (removed duplicates)
 builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
-builder.Configuration.AddJsonFile($"appsettings.secret.json", optional: true, reloadOnChange: true);
+builder.Configuration.AddJsonFile("secrets/appsettings.secrets.json", optional: true, reloadOnChange: true);
+builder.Configuration.AddUserSecrets<Program>();
 
 // Configure services using extension methods
 builder.Services.AddDatabaseServices(builder.Configuration, builder.Environment);
