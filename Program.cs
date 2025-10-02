@@ -7,8 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add configuration sources (removed duplicates)
 builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json",  true, true);
-builder.Configuration.AddJsonFile("secrets/appsettings.secrets.json", true, true);
+builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
+builder.Configuration.AddJsonFile("secrets/appsettings.secrets.json", optional: true, reloadOnChange: true);
 builder.Configuration.AddUserSecrets<Program>();
 
 // Configure services using extension methods
