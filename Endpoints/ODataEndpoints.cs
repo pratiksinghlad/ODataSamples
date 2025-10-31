@@ -38,8 +38,8 @@ public static class ODataEndpoints
     /// </summary>
     private static void MapCustomerODataEndpoints(WebApplication app)
     {
-        var group = app.MapGroup("odata/CustomersOData")
-            .WithTags("Customers OData")
+        var group = app.MapGroup("odata/Customers")
+            .WithTags("Customers")
             .WithOpenApi()
             .WithDescription("OData endpoints for Customer entities with advanced querying capabilities");
 
@@ -114,7 +114,7 @@ public static class ODataEndpoints
                 await unitOfWork.SaveChangesAsync();
 
                 logger.LogInformation("Created customer {CustomerId} via OData", createdCustomer.Id);
-                return Results.Created($"/odata/CustomersOData({createdCustomer.Id})", createdCustomer);
+                return Results.Created($"/odata/Customers({createdCustomer.Id})", createdCustomer);
             }
             catch (Exception ex)
             {
@@ -210,8 +210,8 @@ public static class ODataEndpoints
     /// </summary>
     private static void MapProductODataEndpoints(WebApplication app)
     {
-        var group = app.MapGroup("odata/ProductsOData")
-            .WithTags("Products OData")
+        var group = app.MapGroup("odata/Products")
+            .WithTags("Products")
             .WithOpenApi()
             .WithDescription("OData endpoints for Product entities with advanced querying capabilities");
 
@@ -281,7 +281,7 @@ public static class ODataEndpoints
                 await unitOfWork.SaveChangesAsync();
 
                 logger.LogInformation("Created product {ProductId} via OData", createdProduct.Id);
-                return Results.Created($"/odata/ProductsOData({createdProduct.Id})", createdProduct);
+                return Results.Created($"/odata/Products({createdProduct.Id})", createdProduct);
             }
             catch (Exception ex)
             {
@@ -369,8 +369,8 @@ public static class ODataEndpoints
     /// </summary>
     private static void MapOrderODataEndpoints(WebApplication app)
     {
-        var group = app.MapGroup("odata/OrdersOData")
-            .WithTags("Orders OData")
+        var group = app.MapGroup("odata/Orders")
+            .WithTags("Orders")
             .WithOpenApi()
             .WithDescription("OData endpoints for Order entities with advanced querying capabilities");
 
@@ -440,7 +440,7 @@ public static class ODataEndpoints
                 await unitOfWork.SaveChangesAsync();
 
                 logger.LogInformation("Created order {OrderId} via OData", createdOrder.Id);
-                return Results.Created($"/odata/OrdersOData({createdOrder.Id})", createdOrder);
+                return Results.Created($"/odata/Orders({createdOrder.Id})", createdOrder);
             }
             catch (Exception ex)
             {

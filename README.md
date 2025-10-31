@@ -21,8 +21,8 @@ This application follows a clean architecture pattern with the following layers:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    OData Controllers                        │
-│  (CustomersODataController, ProductsODataController, etc.) │
+│                  OData Minimal API                          │
+│   (CustomerEndpoints, ProductEndpoints, OrderEndpoints)     │
 └─────────────────────┬───────────────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────────────┐
@@ -49,14 +49,14 @@ This application follows a clean architecture pattern with the following layers:
 
 ## 🔍 How OData Filtering Works
 
-### The Magic Behind `[EnableQuery]`
+### Modern .NET 9 OData with Minimal API
 
-The key to OData filtering is the `[EnableQuery]` attribute. Here's how it works:
+OData functionality is implemented using .NET 9's modern Minimal API approach. Here's how it works:
 
 #### 1. **OData Configuration** (Program.cs)
 
 ```csharp
-builder.Services.AddControllers()
+builder.Services.AddMvc()
     .AddOData(options => options
         .Select()     // Enables $select queries
         .Filter()     // Enables $filter queries  ⭐ KEY FOR FILTERING
@@ -75,9 +75,9 @@ static IEdmModel GetEdmModel()
     var builder = new ODataConventionModelBuilder();
     
     // Register entity sets - creates OData endpoints
-    builder.EntitySet<CustomerModel>("CustomersOData");
-    builder.EntitySet<ProductModel>("ProductsOData");
-    builder.EntitySet<OrderModel>("OrdersOData");
+    builder.EntitySet<CustomerModel>("Customers");
+    builder.EntitySet<ProductModel>("Products");
+    builder.EntitySet<OrderModel>("Orders");
     
     // Configure entity properties
     builder.EntityType<CustomerModel>()
@@ -87,17 +87,22 @@ static IEdmModel GetEdmModel()
 }
 ```
 
-#### 3. **Controller with EnableQuery**
+#### 3. **Minimal API OData Endpoints**
 
 ```csharp
-[EnableQuery(MaxExpansionDepth = 3, MaxTop = 1000, MaxOrderByNodeCount = 10)]
-public IActionResult Get()
+// Endpoints/ODataEndpoints.cs
+public static class ODataEndpoints
 {
-    try
+    public static WebApplication MapODataEndpoints(this WebApplication app)
     {
-        // ⭐ CRITICAL: Returns IQueryable, NOT executed data
-        var customers = _unitOfWork.Customers.GetAll();
-        return Ok(customers);
+        app.MapGroup("odata/Customers")
+            .MapGet("/", ([FromServices] IUnitOfWork unitOfWork) =>
+            {
+                // ⭐ CRITICAL: Returns IQueryable for OData processing
+                var customers = unitOfWork.Customers.GetAll();
+                return Results.Ok(customers);
+            })
+            .WithOpenApi();
     }
     catch (Exception ex)
     {
